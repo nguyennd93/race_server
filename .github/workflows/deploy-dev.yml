@@ -12,9 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Đóng gói code (chạy TRƯỚC khi tạo .env để không gói nhầm file env)
+      # Đóng gói code. Nén ra thư mục tạm rồi đưa vào để tar không tự-nén-chính-nó
+      # (tránh lỗi "tar: .: file changed as we read it").
       - name: Package
-        run: tar czf server.tar.gz --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='.git' .
+        run: |
+          tar czf "$RUNNER_TEMP/server.tar.gz" \
+            --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='.git' .
+          mv "$RUNNER_TEMP/server.tar.gz" server.tar.gz
 
       # Dựng .env từ các secret riêng lẻ (nhạy cảm) + giá trị cố định (không nhạy cảm)
       - name: Build .env
