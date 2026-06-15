@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Đóng gói code (bỏ thứ không cần — .env nằm sẵn trên EC2)
+      # Đóng gói code (.env KHÔNG nằm trong repo — sẽ ghi từ secret bên dưới)
       - name: Package
         run: tar czf server.tar.gz --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='.git' .
 
@@ -27,14 +27,19 @@ jobs:
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1
+        env:
+          DEV_ENV_B64: ${{ secrets.DEV_ENV_B64 }}
         with:
           host: ${{ secrets.DEV_HOST }}
           username: ubuntu
           key: ${{ secrets.DEV_SSH_KEY }}
+          envs: DEV_ENV_B64
           script: |
             mkdir -p ~/server
             tar xzf ~/server.tar.gz -C ~/server
             cd ~/server
+            # Ghi .env từ secret (base64) -> nguồn duy nhất là GitHub Secret
+            echo "$DEV_ENV_B64" | base64 -d > .env
             docker compose --env-file .env up -d --build
             docker image prune -f
             echo "✅ Dev deployed"
