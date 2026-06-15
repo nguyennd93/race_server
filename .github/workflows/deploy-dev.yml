@@ -12,9 +12,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Đóng gói code (.env KHÔNG nằm trong repo — sẽ ghi từ secret bên dưới)
+      # Đóng gói code (chạy TRƯỚC khi tạo .env để không gói nhầm file env)
       - name: Package
         run: tar czf server.tar.gz --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='.git' .
+
+      # Dựng .env từ các secret riêng lẻ (nhạy cảm) + giá trị cố định (không nhạy cảm)
+      - name: Build .env
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.DEV_MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD: ${{ secrets.DEV_MYSQL_PASSWORD }}
+          JWT_SECRET: ${{ secrets.DEV_JWT_SECRET }}
+        run: |
+          {
+            echo "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD"
+            echo "MYSQL_DATABASE=race_game"
+            echo "MYSQL_USER=race_user"
+            echo "MYSQL_PASSWORD=$MYSQL_PASSWORD"
+            echo "DATABASE_URL=mysql://race_user:$MYSQL_PASSWORD@mysql:3306/race_game"
+            echo "JWT_SECRET=$JWT_SECRET"
+            echo "JWT_EXPIRES_IN=30d"
+            echo "PORT=3000"
+            echo "GAME_PORT=2567"
+            echo "NODE_ENV=development"
+          } > env.generated
 
       - name: Copy to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -22,24 +42,20 @@ jobs:
           host: ${{ secrets.DEV_HOST }}
           username: ubuntu
           key: ${{ secrets.DEV_SSH_KEY }}
-          source: "server.tar.gz"
+          source: "server.tar.gz,env.generated"
           target: "~"
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1
-        env:
-          DEV_ENV_B64: ${{ secrets.DEV_ENV_B64 }}
         with:
           host: ${{ secrets.DEV_HOST }}
           username: ubuntu
           key: ${{ secrets.DEV_SSH_KEY }}
-          envs: DEV_ENV_B64
           script: |
             mkdir -p ~/server
             tar xzf ~/server.tar.gz -C ~/server
+            mv ~/env.generated ~/server/.env
             cd ~/server
-            # Ghi .env từ secret (base64) -> nguồn duy nhất là GitHub Secret
-            echo "$DEV_ENV_B64" | base64 -d > .env
             docker compose --env-file .env up -d --build
             docker image prune -f
             echo "✅ Dev deployed"
