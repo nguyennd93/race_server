@@ -1,0 +1,23 @@
+# Override thêm Caddy (reverse proxy + tự động HTTPS/WSS).
+# Dùng kèm: docker compose --env-file .env -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+services:
+  caddy:
+    image: caddy:2
+    container_name: race_caddy
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      REST_DOMAIN: ${REST_DOMAIN}
+      RT_DOMAIN: ${RT_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

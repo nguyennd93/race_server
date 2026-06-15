@@ -1,0 +1,10 @@
+# Caddy tự xin chứng chỉ Let's Encrypt cho 2 subdomain rồi reverse-proxy vào container `api`.
+# REST_DOMAIN / RT_DOMAIN lấy từ biến môi trường (.env).
+
+{$REST_DOMAIN} {
+    reverse_proxy api:3000
+}
+
+{$RT_DOMAIN} {
+    reverse_proxy api:2567
+}

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: race_game_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=15
+
+    env:
+      DATABASE_URL: "mysql://root:root@localhost:3306/race_game_test"
+      JWT_SECRET: ci-test-secret
+      JWT_EXPIRES_IN: 30d
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma db push        # kiểm tra schema áp được lên DB trống
+      - run: npm run build             # typecheck + biên dịch (gồm Colyseus schema)
