@@ -26,6 +26,8 @@ jobs:
           MYSQL_ROOT_PASSWORD: ${{ secrets.DEV_MYSQL_ROOT_PASSWORD }}
           MYSQL_PASSWORD: ${{ secrets.DEV_MYSQL_PASSWORD }}
           JWT_SECRET: ${{ secrets.DEV_JWT_SECRET }}
+          REST_DOMAIN: ${{ vars.DEV_REST_DOMAIN }}
+          RT_DOMAIN: ${{ vars.DEV_RT_DOMAIN }}
         run: |
           {
             echo "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD"
@@ -38,6 +40,8 @@ jobs:
             echo "PORT=3000"
             echo "GAME_PORT=2567"
             echo "NODE_ENV=development"
+            echo "REST_DOMAIN=$REST_DOMAIN"
+            echo "RT_DOMAIN=$RT_DOMAIN"
           } > env.generated
 
       - name: Copy to EC2
@@ -60,6 +64,6 @@ jobs:
             tar xzf ~/server.tar.gz -C ~/server
             mv ~/env.generated ~/server/.env
             cd ~/server
-            docker compose --env-file .env up -d --build
+            docker compose --env-file .env -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
             docker image prune -f
-            echo "✅ Dev deployed"
+            echo "✅ Dev deployed (HTTPS qua Caddy)"
