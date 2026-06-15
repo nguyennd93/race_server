@@ -1,8 +1,6 @@
 name: Deploy Dev
 
 # Tự deploy lên EC2 dev khi push nhánh develop (hoặc bấm tay).
-# .env được kéo từ AWS SSM Parameter Store NGAY TRÊN EC2 (qua IAM role),
-# nên GitHub chỉ cần DEV_HOST + DEV_SSH_KEY (không giữ secret ứng dụng).
 on:
   push:
     branches: [develop]
@@ -14,8 +12,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Đóng gói code (chạy TRƯỚC khi tạo .env để không gói nhầm file env)
       - name: Package
         run: tar czf server.tar.gz --exclude='node_modules' --exclude='dist' --exclude='.env' --exclude='.git' .
+
+      # Dựng .env từ các secret riêng lẻ (nhạy cảm) + giá trị cố định (không nhạy cảm)
+      - name: Build .env
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.DEV_MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD: ${{ secrets.DEV_MYSQL_PASSWORD }}
+          JWT_SECRET: ${{ secrets.DEV_JWT_SECRET }}
+        run: |
+          {
+            echo "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD"
+            echo "MYSQL_DATABASE=race_game"
+            echo "MYSQL_USER=race_user"
+            echo "MYSQL_PASSWORD=$MYSQL_PASSWORD"
+            echo "DATABASE_URL=mysql://race_user:$MYSQL_PASSWORD@mysql:3306/race_game"
+            echo "JWT_SECRET=$JWT_SECRET"
+            echo "JWT_EXPIRES_IN=30d"
+            echo "PORT=3000"
+            echo "GAME_PORT=2567"
+            echo "NODE_ENV=development"
+          } > env.generated
 
       - name: Copy to EC2
         uses: appleboy/scp-action@v0.1.7
@@ -23,7 +42,7 @@ jobs:
           host: ${{ secrets.DEV_HOST }}
           username: ubuntu
           key: ${{ secrets.DEV_SSH_KEY }}
-          source: "server.tar.gz"
+          source: "server.tar.gz,env.generated"
           target: "~"
 
       - name: Deploy on EC2
@@ -35,10 +54,8 @@ jobs:
           script: |
             mkdir -p ~/server
             tar xzf ~/server.tar.gz -C ~/server
+            mv ~/env.generated ~/server/.env
             cd ~/server
-            command -v aws >/dev/null || { sudo apt-get update -y && sudo apt-get install -y awscli; }
-            chmod +x fetch-env.sh
-            AWS_REGION=ap-southeast-1 SSM_PATH=/race/dev ./fetch-env.sh
             docker compose --env-file .env up -d --build
             docker image prune -f
             echo "✅ Dev deployed"
