@@ -1,39 +1,16 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: race_mysql
-    restart: unless-stopped
-    ports:
-      - "3306:3306"
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   api:
     build: .                       # build từ Dockerfile cùng thư mục
     container_name: race_api
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy # đợi MySQL khỏe rồi mới chạy api
     ports:
       - "3000:3000"
       - "2567:2567"
     environment:
-      # CHÚ Ý: host là "mysql" (tên service), KHÔNG phải localhost
-      DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE}"
+      # DB giờ là RDS (không còn container mysql). DATABASE_URL lấy nguyên từ .env
+      # (deploy-dev.yml tự dựng, host = endpoint RDS).
+      DATABASE_URL: "${DATABASE_URL}"
       JWT_SECRET: "${JWT_SECRET}"
       JWT_EXPIRES_IN: "${JWT_EXPIRES_IN}"
       PORT: "3000"
-
-volumes:
-  mysql_data:
+      GAME_PORT: "2567"
